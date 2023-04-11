@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "boolean_expression"
+version = "0.1.0"
+description = "A simple library for constructing nested boolean expressions and rendering them in various dialects."
+authors = ["Alex Levy <mesozoic@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "boolean_expression.py"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.coverage.run]
+parallel = true
+branch = true
+source = ["boolean_expression"]
+
+[tool.coverage.report]
+show_missing = true
