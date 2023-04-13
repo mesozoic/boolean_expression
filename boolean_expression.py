@@ -493,7 +493,7 @@ class AirtableRenderer(Renderer):
     ...     | EQ("missing", None)
     ... )
     >>> AirtableRenderer().to_str(condition1)
-    "OR({foo}=1, {bar}='2023-01-23', {missing}=EMPTY())"
+    "OR({foo}=1, {bar}='2023-01-23', {missing}=BLANK())"
 
     >>> condition2 = GTE("baz", Decimal('3.5')) & NE("quux", False)
     >>> AirtableRenderer().to_str(condition2)
@@ -525,7 +525,7 @@ class AirtableRenderer(Renderer):
 
     def format_value(self, value: Any) -> str:
         if value is None:
-            return "EMPTY()"
+            return "BLANK()"
         elif isinstance(value, bool):
             return str(int(value))
         elif isinstance(value, (datetime.date, datetime.datetime)):
