@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "boolean_expression"
-version = "0.1.0"
+version = "0.1.1"
 description = "A simple library for constructing nested boolean expressions and rendering them in various dialects."
 authors = ["Alex Levy <mesozoic@users.noreply.github.com>"]
 license = "MIT"
