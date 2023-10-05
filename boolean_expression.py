@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass
-from decimal import Decimal
 from enum import Enum
 from typing import Any, Iterable, Iterator, Tuple
 
@@ -45,7 +44,7 @@ class Condition:
         >>> lft = Expression('a')
         >>> rgt = Expression('b')
         >>> lft & rgt
-        Compound('AND', [Expression('a'), Expression('b')])
+        AND(Expression('a'), Expression('b'))
         """
         return AND(self, other)
 
@@ -54,7 +53,7 @@ class Condition:
         >>> lft = Expression('a')
         >>> rgt = Expression('b')
         >>> lft | rgt
-        Compound('OR', [Expression('a'), Expression('b')])
+        OR(Expression('a'), Expression('b'))
         """
         return OR(self, other)
 
@@ -63,16 +62,15 @@ class Condition:
         >>> lft = Expression('a')
         >>> rgt = Expression('b')
         >>> lft ^ rgt
-        Compound('OR',
-         [Compound('AND', [Expression('a'), Compound('NOT', [Expression('b')])]),
-          Compound('AND', [Expression('b'), Compound('NOT', [Expression('a')])])])
+        OR(AND(Expression('a'), NOT(Expression('b'))),
+           AND(Expression('b'), NOT(Expression('a'))))
         """
         return OR(AND(self, NOT(other)), AND(other, NOT(self)))
 
     def __invert__(self) -> Compound:
         """
         >>> ~Expression('a')
-        Compound('NOT', [Expression('a')])
+        NOT(Expression('a'))
         """
         return NOT(self)
 
@@ -91,7 +89,7 @@ class Expression(Condition):
 
     >>> expr = Expression('LAST_MODIFIED_TIME() >= "2023-01-01"')
     >>> EQ("foo", 5) & expr
-    Compound('AND', [EQ('foo', 5), Expression('LAST_MODIFIED_TIME() >= "2023-01-01"')])
+    AND(EQ('foo', 5), Expression('LAST_MODIFIED_TIME() >= "2023-01-01"'))
     """
 
     def __init__(self, value: str) -> None:
@@ -169,14 +167,14 @@ class Compound(Condition):
     Represents a compound logical operator wrapping around one or more conditions.
 
     >>> Compound('AND', [EQ('foo', 1), EQ('bar', 2)])
-    Compound('AND', [EQ('foo', 1), EQ('bar', 2)])
+    AND(EQ('foo', 1), EQ('bar', 2))
 
     >>> Compound('AND', [])
     Traceback (most recent call last):
     ValueError: Compound() requires at least one condition
 
     >>> Compound('OR', (EQ('foo', x) for x in range(3)))
-    Compound('OR', [EQ('foo', 0), EQ('foo', 1), EQ('foo', 2)])
+    OR(EQ('foo', 0), EQ('foo', 1), EQ('foo', 2))
     """
 
     operator: CompoundOperator
@@ -198,9 +196,7 @@ class Compound(Condition):
         self.components = components
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}({self.operator.value!r}, {self.components!r})"
-        )
+        return f"{self.operator.value}({repr(self.components)[1:-1]})"
 
     def __iter__(self) -> Iterator[Condition]:
         return iter(self.components)
@@ -216,22 +212,20 @@ class Compound(Condition):
         >>> e = EQ("e", "e")
         >>> c = (a & b) & (c & (d | e))
         >>> c
-        Compound('AND', [Compound('AND', [EQ('a', 'a'),
-                                          EQ('b', 'b')]),
-                         Compound('AND', [EQ('c', 'c'),
-                                          Compound('OR', [EQ('d', 'd'),
-                                                          EQ('e', 'e')])])])
+        AND(AND(EQ('a', 'a'),
+                EQ('b', 'b')),
+            AND(EQ('c', 'c'),
+                OR(EQ('d', 'd'), EQ('e', 'e'))))
         >>> c.flatten()
-        Compound('AND', [EQ('a', 'a'),
-                         EQ('b', 'b'),
-                         EQ('c', 'c'),
-                         Compound('OR', [EQ('d', 'd'), EQ('e', 'e')])])
+        AND(EQ('a', 'a'),
+            EQ('b', 'b'),
+            EQ('c', 'c'),
+            OR(EQ('d', 'd'), EQ('e', 'e')))
         >>> (~c).flatten()
-        Compound('NOT',
-            [Compound('AND', [EQ('a', 'a'),
-                              EQ('b', 'b'),
-                              EQ('c', 'c'),
-                              Compound('OR', [EQ('d', 'd'), EQ('e', 'e')])])])
+        NOT(AND(EQ('a', 'a'),
+                EQ('b', 'b'),
+                EQ('c', 'c'),
+                OR(EQ('d', 'd'), EQ('e', 'e'))))
 
         In the event of a circular dependency, throws an exception.
 
@@ -239,7 +233,7 @@ class Compound(Condition):
         >>> circular.components = [circular]
         >>> circular.flatten()
         Traceback (most recent call last):
-        boolean_expression.CircularDependency: Compound('NOT', [Compound('NOT', [...])])
+        boolean_expression.CircularDependency: NOT(NOT(...))
         """
         memo = memo if memo else set()
         memo.add(id(self))
@@ -266,7 +260,7 @@ def AND(*components: Condition, **fields: Any) -> Compound:
     Joins one or more logical conditions into an AND compound condition.
 
     >>> AND(EQ("foo", 1), EQ("bar", 2), baz=3)
-    Compound('AND', [EQ('foo', 1), EQ('bar', 2), EQ('baz', 3)])
+    AND(EQ('foo', 1), EQ('bar', 2), EQ('baz', 3))
     """
     items = list(components)
     if fields:
@@ -279,7 +273,7 @@ def OR(*components: Condition, **fields: Any) -> Compound:
     Joins one or more logical conditions into an OR compound condition.
 
     >>> OR(EQ("foo", 1), EQ("bar", 2), baz=3)
-    Compound('OR', [EQ('foo', 1), EQ('bar', 2), EQ('baz', 3)])
+    OR(EQ('foo', 1), EQ('bar', 2), EQ('baz', 3))
     """
     items = list(components)
     if fields:
@@ -294,10 +288,10 @@ def NOT(component: Condition | None = None, /, **fields: Any) -> Compound:
     Can be called either explicitly or with kwargs, but not both.
 
     >>> NOT(EQ("foo", 1))
-    Compound('NOT', [EQ('foo', 1)])
+    NOT(EQ('foo', 1))
 
     >>> NOT(foo=1)
-    Compound('NOT', [EQ('foo', 1)])
+    NOT(EQ('foo', 1))
 
     If not called with exactly one condition, will throw an exception:
 
@@ -481,56 +475,3 @@ class LdapRenderer(Renderer):
         if isinstance(value, (datetime.date, datetime.datetime)):
             return value.strftime("%Y%m%d%H%M%SZ")
         return super().format_value(value)
-
-
-class AirtableRenderer(Renderer):
-    """
-    Renders a set of logical conditions representing an Airtable API query.
-
-    >>> condition1 = (
-    ...     EQ("foo", 1)
-    ...     | EQ("bar", datetime.date(2023, 1, 23))
-    ...     | EQ("missing", None)
-    ... )
-    >>> AirtableRenderer().to_str(condition1)
-    "OR({foo}=1, {bar}='2023-01-23', {missing}=BLANK())"
-
-    >>> condition2 = GTE("baz", Decimal('3.5')) & NE("quux", False)
-    >>> AirtableRenderer().to_str(condition2)
-    'AND({baz}>=3.5, {quux}!=0)'
-
-    >>> condition3 = (
-    ...     LT("{Date Field}", Expression("TODAY()"))
-    ...     & Expression('LAST_MODIFIED_TIME() >= "2023-01-01"')
-    ... )
-    >>> AirtableRenderer().to_str(condition3)
-    'AND({Date Field}<TODAY(), LAST_MODIFIED_TIME() >= "2023-01-01")'
-
-    >>> condition = EQ("baz", ["lists", "not", "supported"])
-    >>> AirtableRenderer().to_str(condition)
-    Traceback (most recent call last):
-    TypeError: <class 'list'>
-    """
-
-    compounds = {
-        CompoundOperator.AND: ("AND({items})", ", "),
-        CompoundOperator.OR: ("OR({items})", ", "),
-        CompoundOperator.NOT: ("NOT({items})", ", "),
-    }
-
-    def format_field(self, field: str) -> str:
-        if not (field.startswith("{") and field.endswith("}")):
-            return "{" + field + "}"
-        return field
-
-    def format_value(self, value: Any) -> str:
-        if value is None:
-            return "BLANK()"
-        elif isinstance(value, bool):
-            return str(int(value))
-        elif isinstance(value, (datetime.date, datetime.datetime)):
-            return repr(value.isoformat())
-        elif isinstance(value, (int, float, Decimal, Expression)):
-            return str(value)
-        else:
-            raise TypeError(type(value))
