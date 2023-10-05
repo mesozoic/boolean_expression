@@ -1,11 +1,11 @@
 [tool.poetry]
 name = "boolean_expression"
-version = "0.2.0"
+version = "0.2.0.post1"
 description = "A simple library for constructing nested boolean expressions and rendering them in various dialects."
 authors = ["Alex Levy <mesozoic@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "boolean_expression.py"}]
+packages = [{include = "boolean_expression"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"
